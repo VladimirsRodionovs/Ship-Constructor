@@ -2,92 +2,32 @@
 
 Local engineering tool for ship module design and chassis pre-calculation.
 
-The app provides a JavaFX module designer with JSON-backed fields, engineering catalogs (A-F stack), structural graph preview, and DB persistence to `ShipModules`.
+The app provides a JavaFX module designer, validates structured payload fields, stores module definitions in MySQL (`ShipModules`), and supports local JSON drafts.
 
-## What it does
+## Highlights
+- Module-card editing workflow with validation.
+- Insert/update persistence with `ModuleID` support.
+- Chassis graph and pre-solver diagnostics.
+- Engineering coefficient-driven calculation model.
 
-- edits module cards (general, energy, fuel, lines, storage, JSON blocks);
-- validates and previews payload before save;
-- saves/updates module definitions in MySQL (`ShipModules`);
-- auto-selects next free `ModuleID`;
-- runs chassis graph build/load planning/axial envelope pre-solver for diagnostics;
-- supports local JSON save/load for module drafts.
-
-## Entry point
-
-- `org.example.shipconstructor.ui.ModuleDesignerLauncher`
-
-## Tech stack
-
+## Tech Stack
 - Java 17
 - Maven
 - JavaFX 21
 - Jackson
 - MySQL Connector/J
 
-## Repository structure
+## Quick Start
+1. Configure DB credentials in `.env` (or `project.env`).
+2. Build:
+   - `mvn -q -DskipTests compile`
+3. Run:
+   - `mvn -q javafx:run`
 
-- `src/main/java/org/example/shipconstructor/ui/` - JavaFX UI and form workflows.
-- `src/main/java/org/example/shipconstructor/db/` - env loader + JDBC repository.
-- `src/main/java/org/example/shipconstructor/chassis/` - engineering/chassis model and solvers.
-- `docs/ENGINEERING_REFERENCE.md` - engineering taxonomy (materials/process/quality).
-- `docs/CHASSIS_CALCULATION_MODEL.md` - calculation model and load stages.
-- `data/reference/chassis_coefficients.sample.json` - sample coefficient library.
+## Documentation
+- Internal design: `ARCHITECTURE.md`
+- Engineering taxonomy: `docs/ENGINEERING_REFERENCE.md`
+- Chassis model: `docs/CHASSIS_CALCULATION_MODEL.md`
 
-## Local DB config
-
-The app reads credentials from `.env` (preferred) or `project.env` in project root.
-
-Minimal `.env` example:
-
-```env
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=EXOLOG
-DB_USER=YOUR_DB_USER
-DB_PASSWORD=YOUR_DB_PASSWORD
-```
-
-Alternative full URL:
-
-```env
-DB_URL=jdbc:mysql://127.0.0.1:3306/EXOLOG?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
-DB_USER=YOUR_DB_USER
-DB_PASSWORD=YOUR_DB_PASSWORD
-```
-
-## Build
-
-```bash
-cd /home/vladimirs/ShipConstructor/ShipConstrucor
-mvn -q -DskipTests compile
-```
-
-## Run
-
-```bash
-mvn -q javafx:run
-```
-
-## Key capabilities in UI
-
-- New / Duplicate / Clear workflows;
-- Validate JSON fields;
-- Save Local / Load Local;
-- Save to DB (insert/update by `ModuleID`);
-- Chassis graph preview and solver diagnostics.
-
-## Engineering model
-
-Chassis output is influenced by layered stack:
-
-`A BaseMaterial -> B StructureType -> C ManufacturingProcess -> D AssemblyProcess -> E QualityProfile -> F EnvironmentProfile`
-
-See details and templates in:
-- `docs/ENGINEERING_REFERENCE.md`
-- `docs/CHASSIS_CALCULATION_MODEL.md`
-
-## Notes
-
-- This is a tool project, not a runtime game server component.
-- Keep real credentials only in local env files, never in tracked docs/code.
+## Contact
+vladimirs.rodionovs@gmail.com
