@@ -1,0 +1,259 @@
+{
+  "schema": "chassis-coefficients-v1",
+  "description": "Sample calibration-ready coefficient data for mapping A-F engineering selections to chassis calculation coefficients.",
+  "notes": [
+    "This sample file is loaded by code when available; fallback provider is used if loading fails.",
+    "IDs correspond to reference catalogs in ENGINEERING_REFERENCE.md or future DB tables.",
+    "Material density values below are anchored to real-world reference ranges where available.",
+    "Normalized material indices use Structural Steel baseline ~= 1.0 (density ~7850 kg/m3, E ~200 GPa, yield ~250 MPa baseline class).",
+    "Composite and ceramic material indices are intentionally simplified/clamped for isotropic v0 chassis model and must be refined with anisotropy/brittleness factors later."
+  ],
+  "material_profiles_by_base_material_id": {
+    "1": {
+      "name": "Structural Steel",
+      "materialDensityKgM3": 7850.0,
+      "materialStrengthIndex": 1.0,
+      "materialStiffnessIndex": 1.0,
+      "materialFatigueIndex": 1.0,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 1.0,
+      "materialTemperaturePenaltyFactor": 0.94,
+      "materialThermalCyclingPenaltyFactor": 0.95
+    },
+    "2": {
+      "name": "HSLA Steel",
+      "materialDensityKgM3": 7850.0,
+      "materialStrengthIndex": 2.7,
+      "materialStiffnessIndex": 1.0,
+      "materialFatigueIndex": 1.1,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 1.0,
+      "materialTemperaturePenaltyFactor": 0.93,
+      "materialThermalCyclingPenaltyFactor": 0.94
+    },
+    "5": {
+      "name": "Aluminum Alloy",
+      "materialDensityKgM3": 2700.0,
+      "materialStrengthIndex": 1.1,
+      "materialStiffnessIndex": 0.34,
+      "materialFatigueIndex": 0.85,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 0.98,
+      "materialTemperaturePenaltyFactor": 0.88,
+      "materialThermalCyclingPenaltyFactor": 0.92
+    },
+    "10": {
+      "name": "Titanium Alloy",
+      "materialDensityKgM3": 4450.0,
+      "materialStrengthIndex": 3.4,
+      "materialStiffnessIndex": 0.56,
+      "materialFatigueIndex": 1.2,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 1.0,
+      "materialTemperaturePenaltyFactor": 0.95,
+      "materialThermalCyclingPenaltyFactor": 0.97
+    },
+    "13": {
+      "name": "Nickel Superalloy (Inconel-718-like baseline)",
+      "materialDensityKgM3": 8210.0,
+      "materialStrengthIndex": 4.1,
+      "materialStiffnessIndex": 1.0,
+      "materialFatigueIndex": 1.1,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 0.97,
+      "materialTemperaturePenaltyFactor": 1.00,
+      "materialThermalCyclingPenaltyFactor": 0.98
+    },
+    "27": {
+      "name": "Alumina Ceramic (structural grade, simplified)",
+      "materialDensityKgM3": 3850.0,
+      "materialStrengthIndex": 1.2,
+      "materialStiffnessIndex": 1.7,
+      "materialFatigueIndex": 0.45,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 0.55,
+      "materialTemperaturePenaltyFactor": 0.92,
+      "materialThermalCyclingPenaltyFactor": 0.72
+    },
+    "28": {
+      "name": "Silicon Carbide Ceramic (simplified)",
+      "materialDensityKgM3": 3000.0,
+      "materialStrengthIndex": 1.0,
+      "materialStiffnessIndex": 1.9,
+      "materialFatigueIndex": 0.40,
+      "materialAnisotropyPenaltyFactor": 1.0,
+      "materialBrittlenessPenaltyFactor": 0.60,
+      "materialTemperaturePenaltyFactor": 0.96,
+      "materialThermalCyclingPenaltyFactor": 0.78
+    },
+    "35": {
+      "name": "CFRP (legacy temp ID, averaged/clamped)",
+      "materialDensityKgM3": 1575.0,
+      "materialStrengthIndex": 1.8,
+      "materialStiffnessIndex": 0.65,
+      "materialFatigueIndex": 0.90,
+      "materialAnisotropyPenaltyFactor": 0.78,
+      "materialBrittlenessPenaltyFactor": 0.90,
+      "materialTemperaturePenaltyFactor": 0.80,
+      "materialThermalCyclingPenaltyFactor": 0.82
+    },
+    "39": {
+      "name": "CFRP (reference-aligned ID, averaged/clamped)",
+      "materialDensityKgM3": 1575.0,
+      "materialStrengthIndex": 1.8,
+      "materialStiffnessIndex": 0.65,
+      "materialFatigueIndex": 0.90,
+      "materialAnisotropyPenaltyFactor": 0.78,
+      "materialBrittlenessPenaltyFactor": 0.90,
+      "materialTemperaturePenaltyFactor": 0.80,
+      "materialThermalCyclingPenaltyFactor": 0.82
+    }
+  },
+  "structure_profiles_by_structure_type_id": {
+    "1": {
+      "name": "Monolithic Solid Section",
+      "structureEffectiveDensityFactor": 1.0,
+      "structureSpecificStrengthFactor": 1.0,
+      "structureSpecificStiffnessFactor": 1.0,
+      "structureBucklingResistanceFactor": 1.0,
+      "structureDamageToleranceFactor": 1.0
+    },
+    "10": {
+      "name": "Truss Frame",
+      "structureEffectiveDensityFactor": 0.62,
+      "structureSpecificStrengthFactor": 1.15,
+      "structureSpecificStiffnessFactor": 1.05,
+      "structureBucklingResistanceFactor": 0.95,
+      "structureDamageToleranceFactor": 0.95
+    },
+    "17": {
+      "name": "Iso-grid Shell",
+      "structureEffectiveDensityFactor": 0.74,
+      "structureSpecificStrengthFactor": 1.18,
+      "structureSpecificStiffnessFactor": 1.20,
+      "structureBucklingResistanceFactor": 1.20,
+      "structureDamageToleranceFactor": 0.95
+    },
+    "42": {
+      "name": "Hierarchical Lattice",
+      "structureEffectiveDensityFactor": 0.18,
+      "structureSpecificStrengthFactor": 1.28,
+      "structureSpecificStiffnessFactor": 1.22,
+      "structureBucklingResistanceFactor": 1.05,
+      "structureDamageToleranceFactor": 0.90
+    }
+  },
+  "manufacturing_profiles_by_process_id": {
+    "1": {
+      "name": "Casting",
+      "manufacturingQualityFactor": 0.72,
+      "manufacturingDefectPenaltyFactor": 0.80
+    },
+    "3": {
+      "name": "Forging",
+      "manufacturingQualityFactor": 0.86,
+      "manufacturingDefectPenaltyFactor": 0.93
+    },
+    "24": {
+      "name": "Additive Manufacturing (PBF metal)",
+      "manufacturingQualityFactor": 0.84,
+      "manufacturingDefectPenaltyFactor": 0.82
+    },
+    "26": {
+      "name": "Additive + HIP Hybrid Manufacturing",
+      "manufacturingQualityFactor": 0.90,
+      "manufacturingDefectPenaltyFactor": 0.92
+    },
+    "42": {
+      "name": "Full In-situ Tomography Closed-Loop Manufacturing",
+      "manufacturingQualityFactor": 0.95,
+      "manufacturingDefectPenaltyFactor": 0.96
+    },
+    "43": {
+      "name": "Full Defect-Cartography Guided Manufacturing",
+      "manufacturingQualityFactor": 0.97,
+      "manufacturingDefectPenaltyFactor": 0.98
+    }
+  },
+  "assembly_profiles_by_process_id": {
+    "1": {
+      "name": "Bolted Mechanical Assembly",
+      "assemblyJointEfficiencyFactor": 0.74,
+      "assemblyStressConcentrationPenaltyFactor": 1.25
+    },
+    "8": {
+      "name": "Friction Stir Welding",
+      "assemblyJointEfficiencyFactor": 0.90,
+      "assemblyStressConcentrationPenaltyFactor": 1.08
+    },
+    "9": {
+      "name": "Diffusion-Bonded Panel Assembly",
+      "assemblyJointEfficiencyFactor": 0.94,
+      "assemblyStressConcentrationPenaltyFactor": 1.04
+    },
+    "17": {
+      "name": "Structural Adhesive Bonding",
+      "assemblyJointEfficiencyFactor": 0.86,
+      "assemblyStressConcentrationPenaltyFactor": 1.10
+    },
+    "34": {
+      "name": "Atomic-Interface-Assisted Critical Joint Assembly",
+      "assemblyJointEfficiencyFactor": 0.97,
+      "assemblyStressConcentrationPenaltyFactor": 1.02
+    }
+  },
+  "quality_profiles_by_quality_id": {
+    "1": {
+      "name": "Basic Industrial QA",
+      "qualityConfidenceFactor": 0.55,
+      "qualityMarginReductionFactor": 0.20
+    },
+    "6": {
+      "name": "Pressure-Hull Reliability QA",
+      "qualityConfidenceFactor": 0.74,
+      "qualityMarginReductionFactor": 0.45
+    },
+    "12": {
+      "name": "Mission-Critical Structural Certification QA",
+      "qualityConfidenceFactor": 0.84,
+      "qualityMarginReductionFactor": 0.65
+    },
+    "19": {
+      "name": "Full Defect Cartography QA",
+      "qualityConfidenceFactor": 0.94,
+      "qualityMarginReductionFactor": 0.82
+    },
+    "25": {
+      "name": "Near-Theoretical Margin Reduction Certified QA",
+      "qualityConfidenceFactor": 0.97,
+      "qualityMarginReductionFactor": 0.90
+    }
+  },
+  "environment_profiles_by_environment_id": {
+    "1": {
+      "name": "Low-Radiation Deep Space Vacuum",
+      "environmentDegradationFactor": 0.94,
+      "environmentFatigueAccelerationFactor": 1.05
+    },
+    "8": {
+      "name": "Extreme Thermal Cycling Orbit",
+      "environmentDegradationFactor": 0.88,
+      "environmentFatigueAccelerationFactor": 1.25
+    },
+    "21": {
+      "name": "Reactor-Adjacent Structural Radiation Profile",
+      "environmentDegradationFactor": 0.86,
+      "environmentFatigueAccelerationFactor": 1.20
+    },
+    "31": {
+      "name": "Military High-G Maneuver + Combat Profile",
+      "environmentDegradationFactor": 0.82,
+      "environmentFatigueAccelerationFactor": 1.35
+    },
+    "34": {
+      "name": "Atmospheric Entry-Capable Hybrid Mission Profile",
+      "environmentDegradationFactor": 0.82,
+      "environmentFatigueAccelerationFactor": 1.30
+    }
+  }
+}
