@@ -1,76 +1,77 @@
 # ARCHITECTURE — ShipConstructor
 
-## Назначение
-`ShipConstrucor` — локальный инженерный инструмент для проектирования корабельных модулей и предварительного расчета шасси. Приложение работает как JavaFX desktop UI с сохранением модулей в MySQL и поддержкой локальных JSON-черновиков.
+## Purpose
+`ShipConstrucor` is a local engineering tool for ship-module design and chassis pre-calculation. It is a JavaFX desktop app with MySQL persistence and local JSON draft support.
 
-## Технологический стек
+## Tech stack
 - Java 17
 - Maven
 - JavaFX 21
 - Jackson
 - MySQL Connector/J
 
-## Высокоуровневый поток
-1. Пользователь редактирует карточку модуля в UI.
-2. Валидация полей и JSON-блоков перед сохранением.
-3. Формируется доменная модель модуля.
-4. Сохранение в `ShipModules` (insert/update, автоподбор `ModuleID`).
-5. Для диагностики может запускаться граф шасси и pre-solver нагрузки.
-6. По необходимости данные сохраняются/загружаются как локальный JSON draft.
+## High-level flow
+1. User edits module card in UI.
+2. UI validates fields and JSON blocks.
+3. App builds module domain model.
+4. Data is saved to `ShipModules` (insert/update, next free `ModuleID`).
+5. Chassis graph/pre-solver can run for diagnostics.
+6. Draft can be saved/loaded as local JSON.
 
-## Слои
+## Layers
 ### 1) UI layer
-- Пакет: `org.example.shipconstructor.ui`
-- Точка входа: `ModuleDesignerLauncher`
-- Роль: форма редактирования, действия New/Duplicate/Clear, валидация и вызов сервисов.
+- Package: `org.example.shipconstructor.ui`
+- Entry point: `ModuleDesignerLauncher`
+- Responsibility: form workflow, New/Duplicate/Clear actions, validation, service calls.
 
 ### 2) Application/service layer
-- Пакет: `org.example.shipconstructor.service`
-- Роль: orchestration между UI, domain, DB и локальным IO.
+- Package: `org.example.shipconstructor.service`
+- Responsibility: orchestration between UI, domain, DB, and local IO.
 
 ### 3) Domain model
-- Пакет: `org.example.shipconstructor.domain`
-- Роль: структура модуля и бизнес-сущности конструктора.
+- Package: `org.example.shipconstructor.domain`
+- Responsibility: ship-module business entities.
 
 ### 4) Chassis subsystem
-- Пакет: `org.example.shipconstructor.chassis`
-- Подпакеты:
-  - `domain` — модель расчета шасси;
-  - `graph` — построение структурного графа;
-  - `service` — вычислительные и диагностические сервисы;
-  - `ui` — представление/диагностика для пользователя;
-  - `demo` — демонстрационные сценарии.
-- Роль: предрасчет нагрузки, осевые ограничения и диагностические метрики.
+- Package: `org.example.shipconstructor.chassis`
+- Subpackages:
+  - `domain` — calculation entities;
+  - `graph` — structural graph construction;
+  - `service` — solver/diagnostic services;
+  - `ui` — chassis-related UI;
+  - `demo` — demo scenarios.
+- Responsibility: load planning, axial envelope checks, and diagnostic metrics.
 
 ### 5) Persistence layer
-- Пакет: `org.example.shipconstructor.db`
-- Роль:
-  - загрузка env-конфигурации (`.env`/`project.env`);
-  - JDBC-доступ к MySQL;
-  - операции чтения/записи таблицы `ShipModules`.
+- Package: `org.example.shipconstructor.db`
+- Responsibility:
+  - read env config (`.env` / `project.env`);
+  - JDBC MySQL access;
+  - read/write `ShipModules` records.
 
-## Конфигурация
-- Приоритет источников конфигурации БД: `.env` (предпочтительно), затем `project.env`.
-- Поддерживаются настройки через `DB_HOST/PORT/NAME` или полный `DB_URL`.
+## Configuration
+- DB config priority: `.env` first, `project.env` fallback.
+- Supports `DB_HOST/PORT/NAME` split settings or full `DB_URL`.
 
-## Контракты и интеграции
-- Основная таблица: `ShipModules` (MySQL `EXOLOG`).
-- Документация инженерных коэффициентов и модели:
+## Contracts and integrations
+- Main table: `ShipModules` (MySQL `EXOLOG`).
+- Engineering docs:
   - `docs/ENGINEERING_REFERENCE.md`
   - `docs/CHASSIS_CALCULATION_MODEL.md`
-- Сэмплы коэффициентов: `data/reference/chassis_coefficients.sample.json`.
+- Coefficients sample:
+  - `data/reference/chassis_coefficients.sample.json`
 
-## Точки расширения
-- Добавление новых атрибутов модуля: расширение `domain` + формы `ui` + mapping в `db`.
-- Новые стадии расчета шасси: расширение `chassis/service` и модели в `chassis/domain`.
-- Дополнительные форматы обмена: расширение JSON IO в сервисном слое.
+## Extension points
+- New module attributes: extend `domain` + `ui` + DB mapping.
+- New chassis stages: extend `chassis/service` + `chassis/domain`.
+- New exchange formats: extend JSON IO in service layer.
 
-## Риски
-- Связность UI и прикладной логики при росте числа полей.
-- Риск рассинхронизации между JSON-предпросмотром и DB-схемой.
-- Изменения в инженерных коэффициентах требуют повторной калибровки расчетов.
+## Risks
+- UI and application logic may become tightly coupled as form grows.
+- JSON preview and DB schema can drift without coordinated changes.
+- Coefficient model changes require solver recalibration.
 
-## Быстрая навигация
+## Quick navigation
 - Entry point: `src/main/java/org/example/shipconstructor/ui/ModuleDesignerLauncher.java`
 - UI: `src/main/java/org/example/shipconstructor/ui/`
 - Chassis: `src/main/java/org/example/shipconstructor/chassis/`
