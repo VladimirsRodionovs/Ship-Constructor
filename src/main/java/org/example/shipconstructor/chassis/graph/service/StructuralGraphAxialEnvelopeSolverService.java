@@ -2,6 +2,8 @@ package org.example.shipconstructor.chassis.graph.service;
 
 import org.example.shipconstructor.chassis.domain.ChassisCalculationInput;
 import org.example.shipconstructor.chassis.domain.EngineeringStackSelection;
+import org.example.shipconstructor.chassis.domain.StructuralDesignBasis;
+import org.example.shipconstructor.chassis.domain.StructuralOptimizationMode;
 import org.example.shipconstructor.chassis.domain.Vector3;
 import org.example.shipconstructor.chassis.graph.domain.StructuralGraph;
 import org.example.shipconstructor.chassis.graph.domain.StructuralGraphLoad;
@@ -190,7 +192,64 @@ public class StructuralGraphAxialEnvelopeSolverService {
             ));
         }
 
+        applyMarginBandDiagnostics(input, memberEnvelopes, warnings);
+
         return new StructuralGraphSolveResult(memberEnvelopes, panelEnvelopes, share.memberShare, share.panelShare, share.label, warnings);
+    }
+
+    private void applyMarginBandDiagnostics(ChassisCalculationInput input, List<StructuralGraphMemberEnvelope> members, List<String> warnings) {
+        if (input == null || input.getStructuralDesignBasis() == null || members == null || members.isEmpty()) {
+            return;
+        }
+        StructuralDesignBasis basis = input.getStructuralDesignBasis();
+        double minMargin = Math.max(0.1d, basis.getTargetMinMarginIndex());
+        double maxMargin = Math.max(minMargin + 0.1d, basis.getTargetMaxMarginIndex());
+        StructuralOptimizationMode mode = basis.getOptimizationMode() == null ? StructuralOptimizationMode.BALANCED : basis.getOptimizationMode();
+
+        int primaryUnderMargin = 0;
+        List<StructuralGraphMemberEnvelope> secondaryOverMargin = new ArrayList<StructuralGraphMemberEnvelope>();
+        for (StructuralGraphMemberEnvelope e : members) {
+            double demand = Math.max(1e-6d, e.getPeakCombinedAbsIndex());
+            double margin = 1.0d / demand;
+            if (e.getRole() == StructuralMemberRole.PRIMARY_LOAD_PATH && margin < minMargin) {
+                primaryUnderMargin++;
+            }
+            if (e.getRole() == StructuralMemberRole.SECONDARY_STIFFENING && margin > maxMargin) {
+                secondaryOverMargin.add(e);
+            }
+        }
+
+        if (primaryUnderMargin > 0) {
+            warnings.add("margin-band: " + primaryUnderMargin + " primary members are below target min margin (" + f(minMargin) + ")");
+        }
+
+        if ((mode == StructuralOptimizationMode.MIN_MASS || mode == StructuralOptimizationMode.BALANCED) && !secondaryOverMargin.isEmpty()) {
+            secondaryOverMargin.sort((a, b) -> Double.compare(b.getPeakCombinedAbsIndex(), a.getPeakCombinedAbsIndex()));
+            int candidateCount = 0;
+            StringBuilder ids = new StringBuilder();
+            for (StructuralGraphMemberEnvelope e : secondaryOverMargin) {
+                double demand = Math.max(1e-6d, e.getPeakCombinedAbsIndex());
+                double margin = 1.0d / demand;
+                if (margin >= maxMargin * 1.4d) {
+                    if (candidateCount < 8) {
+                        if (ids.length() > 0) {
+                            ids.append(", ");
+                        }
+                        ids.append(e.getMemberId());
+                    }
+                    candidateCount++;
+                }
+            }
+            if (candidateCount > 0) {
+                warnings.add("margin-band: secondary over-margin candidates for lightweighting=" + candidateCount
+                        + " (mode=" + mode + ", target max=" + f(maxMargin) + ")");
+                warnings.add("lightweight candidates: " + ids.toString());
+            }
+        }
+    }
+
+    private String f(double v) {
+        return String.format(java.util.Locale.US, "%.2f", v);
     }
 
     private LoadShareProfile resolveLoadShareProfile(ChassisCalculationInput input) {

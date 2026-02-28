@@ -3,9 +3,14 @@ package org.example.shipconstructor.chassis.graph.service;
 import org.example.shipconstructor.chassis.domain.CapabilityClassSet;
 import org.example.shipconstructor.chassis.domain.ChassisCalculationInput;
 import org.example.shipconstructor.chassis.domain.CubeDimensions;
+import org.example.shipconstructor.chassis.domain.EngineLayerConfig;
+import org.example.shipconstructor.chassis.domain.EngineLayerPattern;
+import org.example.shipconstructor.chassis.domain.EngineLayerSymmetryMode;
+import org.example.shipconstructor.chassis.domain.EngineLayoutConfig;
 import org.example.shipconstructor.chassis.domain.MassDistributionModel;
 import org.example.shipconstructor.chassis.domain.MassNode;
 import org.example.shipconstructor.chassis.domain.StructuralDesignBasis;
+import org.example.shipconstructor.chassis.domain.StructuralOptimizationMode;
 import org.example.shipconstructor.chassis.domain.ThrustLayout;
 import org.example.shipconstructor.chassis.domain.ThrustNode;
 import org.example.shipconstructor.chassis.domain.Vector3;
@@ -58,8 +63,10 @@ public class StructuralGraphBuilderService {
         Map<String, StructuralGraphNode> nodeById = new LinkedHashMap<String, StructuralGraphNode>();
 
         int stations = estimateStationCount(d);
-        BracingProfile bracingProfile = resolveBracingProfile(input);
+        StructuralOptimizationMode optimizationMode = resolveOptimizationMode(input);
+        BracingProfile bracingProfile = resolveBracingProfile(input, optimizationMode);
         buildFrameStations(length, width, height, stations, bracingProfile, nodes, nodeById, members, panels);
+        applyOptimizationPruning(members, optimizationMode, warnings);
         addBulkheads(stations, nodeById, panels);
         addMassAnchors(input.getMassDistributionModel(), length, width, height, stations, nodes, nodeById, members, warnings);
         addEngineMounts(input, length, width, height, stations, nodes, nodeById, members, warnings);
@@ -146,7 +153,8 @@ public class StructuralGraphBuilderService {
             addMember(members, "MSPINE-" + i, "Center spine " + i, StructuralMemberType.CENTER_SPINE,
                     stationCenterId(i), stationCenterId(i + 1));
 
-            if (bracingProfile.addSideLongitudinalDiagonals) {
+            boolean addLongitudinalAtStation = (i % bracingProfile.longitudinalBraceStep) == 0;
+            if (bracingProfile.addSideLongitudinalDiagonals && addLongitudinalAtStation) {
                 addMember(members, "MBRACE-LONG-PORT-A-" + i, "Port longitudinal diagonal brace A " + i, StructuralMemberType.DIAGONAL_BRACE,
                         stationCornerId(i, "B", "P"), stationCornerId(i + 1, "T", "P"));
                 addMember(members, "MBRACE-LONG-PORT-B-" + i, "Port longitudinal diagonal brace B " + i, StructuralMemberType.DIAGONAL_BRACE,
@@ -156,7 +164,7 @@ public class StructuralGraphBuilderService {
                 addMember(members, "MBRACE-LONG-STAR-B-" + i, "Starboard longitudinal diagonal brace B " + i, StructuralMemberType.DIAGONAL_BRACE,
                         stationCornerId(i, "T", "S"), stationCornerId(i + 1, "B", "S"));
             }
-            if (bracingProfile.addTopBottomLongitudinalDiagonals) {
+            if (bracingProfile.addTopBottomLongitudinalDiagonals && addLongitudinalAtStation) {
                 addMember(members, "MBRACE-LONG-TOP-A-" + i, "Top longitudinal diagonal brace A " + i, StructuralMemberType.DIAGONAL_BRACE,
                         stationCornerId(i, "T", "P"), stationCornerId(i + 1, "T", "S"));
                 addMember(members, "MBRACE-LONG-TOP-B-" + i, "Top longitudinal diagonal brace B " + i, StructuralMemberType.DIAGONAL_BRACE,
@@ -178,23 +186,75 @@ public class StructuralGraphBuilderService {
         }
     }
 
-    private BracingProfile resolveBracingProfile(ChassisCalculationInput input) {
+    private BracingProfile resolveBracingProfile(ChassisCalculationInput input, StructuralOptimizationMode mode) {
         String code = input == null ? null : input.getStructureProfileCode();
         if (code == null) {
-            return BracingProfile.frameLight();
+            return adaptBracingByMode(BracingProfile.frameLight(), mode);
         }
         String c = code.trim().toUpperCase();
         if (c.contains("ISOGRID") || c.contains("ORTHOGRID") || c.contains("SANDWICH") || c.contains("HONEYCOMB")
                 || c.contains("LATTICE") || c.contains("SHELL") || c.contains("CORE_")) {
-            return BracingProfile.shellDominated();
+            return adaptBracingByMode(BracingProfile.shellDominated(), mode);
         }
         if (c.contains("SPACE_FRAME") || c.contains("TRUSS")) {
-            return BracingProfile.spaceFrame();
+            return adaptBracingByMode(BracingProfile.spaceFrame(), mode);
         }
         if (c.contains("MONOLITHIC") || c.contains("BOX_BEAM") || c.contains("TUBULAR") || c.contains("RIBBED_FRAME")) {
-            return BracingProfile.frameLight();
+            return adaptBracingByMode(BracingProfile.frameLight(), mode);
         }
-        return BracingProfile.frameLight();
+        return adaptBracingByMode(BracingProfile.frameLight(), mode);
+    }
+
+    private StructuralOptimizationMode resolveOptimizationMode(ChassisCalculationInput input) {
+        if (input == null || input.getStructuralDesignBasis() == null || input.getStructuralDesignBasis().getOptimizationMode() == null) {
+            return StructuralOptimizationMode.BALANCED;
+        }
+        return input.getStructuralDesignBasis().getOptimizationMode();
+    }
+
+    private BracingProfile adaptBracingByMode(BracingProfile base, StructuralOptimizationMode mode) {
+        if (base == null) {
+            base = BracingProfile.frameLight();
+        }
+        if (mode == StructuralOptimizationMode.HIGH_MARGIN) {
+            return new BracingProfile(true, true, true, 1);
+        }
+        if (mode == StructuralOptimizationMode.MIN_MASS) {
+            return new BracingProfile(false, base.addSideLongitudinalDiagonals, false, 2);
+        }
+        return base;
+    }
+
+    private void applyOptimizationPruning(List<StructuralGraphMember> members, StructuralOptimizationMode mode, List<String> warnings) {
+        if (members == null || members.isEmpty() || mode == StructuralOptimizationMode.HIGH_MARGIN) {
+            return;
+        }
+        int removed = 0;
+        List<StructuralGraphMember> keep = new ArrayList<StructuralGraphMember>(members.size());
+        int diagCounter = 0;
+        for (StructuralGraphMember m : members) {
+            if (m.getType() != StructuralMemberType.DIAGONAL_BRACE) {
+                keep.add(m);
+                continue;
+            }
+            boolean remove = false;
+            if (mode == StructuralOptimizationMode.MIN_MASS) {
+                remove = (diagCounter % 2) == 1;
+            } else if (mode == StructuralOptimizationMode.BALANCED) {
+                remove = false;
+            }
+            diagCounter++;
+            if (remove) {
+                removed++;
+            } else {
+                keep.add(m);
+            }
+        }
+        if (removed > 0) {
+            members.clear();
+            members.addAll(keep);
+            warnings.add("optimization pruning removed " + removed + " secondary diagonal braces (mode=" + mode + ")");
+        }
     }
 
     private IntrusionMetrics estimateIntrusionMetrics(StructuralGraph graph, Map<String, StructuralGraphNode> nodeById) {
@@ -348,6 +408,19 @@ public class StructuralGraphBuilderService {
             return;
         }
 
+        EngineLayoutConfig layoutConfig = input.getStructuralDesignBasis() == null ? null : input.getStructuralDesignBasis().getEngineLayoutConfig();
+        List<Vector3> configured = buildEngineNodesFromLayoutConfig(layoutConfig, length, width, height);
+        if (!configured.isEmpty()) {
+            for (Vector3 p : configured) {
+                String mountId = "N-ENG-CFG-" + count;
+                addNode(nodes, nodeById, mountId, "Engine mount config " + count, StructuralNodeType.ENGINE_MOUNT, p);
+                addNode(nodes, nodeById, "N-THR-CFG-" + count, "Thrust load point config " + count, StructuralNodeType.THRUST_LOAD_POINT, p);
+                addMember(members, "MENG-CFG-" + count, "Engine support config " + count, StructuralMemberType.ENGINE_SUPPORT, mountId, nearestCenterId(p, length, stations));
+                count++;
+            }
+            return;
+        }
+
         int profile = resolveEnginePlacementProfileClass(input);
         for (Vector3 p : buildProfileEngineNodes(profile, length, width, height)) {
             String mountId = "N-ENG-P-" + count;
@@ -490,6 +563,102 @@ public class StructuralGraphBuilderService {
         return (input == null || input.getStructuralDesignBasis() == null) ? 0 : input.getStructuralDesignBasis().getEnginePlacementProfileClass();
     }
 
+    private List<Vector3> buildEngineNodesFromLayoutConfig(EngineLayoutConfig config, double length, double width, double height) {
+        List<Vector3> out = new ArrayList<Vector3>();
+        if (config == null || config.isEmpty()) {
+            return out;
+        }
+        double halfLen = 0.5d * length;
+        for (EngineLayerConfig layer : config.getLayers()) {
+            if (layer == null) {
+                continue;
+            }
+            int count = Math.max(1, layer.getEnginesPerLayer());
+            double x = clamp(layer.getXOffsetNormalized(), -1.0d, 1.0d) * halfLen;
+            double ry = Math.max(0.0d, layer.getRadiusYNormalized()) * 0.5d * width;
+            double rz = Math.max(0.0d, layer.getRadiusZNormalized()) * 0.5d * height;
+            double theta = Math.toRadians(layer.getPlaneRotationDeg());
+            List<Vector3> layerPoints = new ArrayList<Vector3>();
+
+            switch (layer.getPattern()) {
+                case LINE:
+                    for (int i = 0; i < count; i++) {
+                        double t = count == 1 ? 0.0d : ((double) i / (count - 1)) * 2.0d - 1.0d;
+                        layerPoints.add(rotateYZ(x, t * ry, 0.0d, theta));
+                    }
+                    break;
+                case RING:
+                    for (int i = 0; i < count; i++) {
+                        double a = (2.0d * Math.PI * i) / count;
+                        layerPoints.add(rotateYZ(x, Math.cos(a) * ry, Math.sin(a) * rz, theta));
+                    }
+                    break;
+                case CROSS:
+                    layerPoints.add(rotateYZ(x, ry, 0.0d, theta));
+                    if (count > 1) layerPoints.add(rotateYZ(x, -ry, 0.0d, theta));
+                    if (count > 2) layerPoints.add(rotateYZ(x, 0.0d, rz, theta));
+                    if (count > 3) layerPoints.add(rotateYZ(x, 0.0d, -rz, theta));
+                    for (int i = 4; i < count; i++) {
+                        double a = (2.0d * Math.PI * (i - 4)) / Math.max(1, count - 4);
+                        layerPoints.add(rotateYZ(x, Math.cos(a) * ry, Math.sin(a) * rz, theta));
+                    }
+                    break;
+                case GRID:
+                    int n = (int) Math.ceil(Math.sqrt(count));
+                    int placed = 0;
+                    for (int gy = 0; gy < n && placed < count; gy++) {
+                        for (int gz = 0; gz < n && placed < count; gz++) {
+                            double ty = n == 1 ? 0.0d : ((double) gy / (n - 1)) * 2.0d - 1.0d;
+                            double tz = n == 1 ? 0.0d : ((double) gz / (n - 1)) * 2.0d - 1.0d;
+                            layerPoints.add(rotateYZ(x, ty * ry, tz * rz, theta));
+                            placed++;
+                        }
+                    }
+                    break;
+                case SINGLE:
+                default:
+                    layerPoints.add(rotateYZ(x, 0.0d, 0.0d, theta));
+                    for (int i = 1; i < count; i++) {
+                        double a = (2.0d * Math.PI * (i - 1)) / Math.max(1, count - 1);
+                        layerPoints.add(rotateYZ(x, Math.cos(a) * ry, Math.sin(a) * rz, theta));
+                    }
+                    break;
+            }
+
+            if (layer.getSymmetryMode() == EngineLayerSymmetryMode.STRICT || layer.getSymmetryMode() == EngineLayerSymmetryMode.MIRROR) {
+                layerPoints = enforceMirrorSymmetry(layerPoints, x, layer.getSymmetryMode() == EngineLayerSymmetryMode.STRICT);
+            }
+            for (Vector3 p : layerPoints) {
+                out.add(clampToEnvelope(p, length, width, height));
+            }
+        }
+        return out;
+    }
+
+    private Vector3 rotateYZ(double x, double y, double z, double theta) {
+        double ct = Math.cos(theta);
+        double st = Math.sin(theta);
+        double yr = y * ct - z * st;
+        double zr = y * st + z * ct;
+        return new Vector3(x, yr, zr);
+    }
+
+    private List<Vector3> enforceMirrorSymmetry(List<Vector3> points, double x, boolean strict) {
+        List<Vector3> out = new ArrayList<Vector3>();
+        for (Vector3 p : points) {
+            if (p == null) {
+                continue;
+            }
+            out.add(p);
+            if (Math.abs(p.getY()) > 1e-9d) {
+                out.add(new Vector3(x, -p.getY(), p.getZ()));
+            } else if (strict && Math.abs(p.getZ()) > 1e-9d) {
+                out.add(new Vector3(x, p.getY(), -p.getZ()));
+            }
+        }
+        return out;
+    }
+
     private String stationCornerId(int i, String z, String y) {
         return "N-S" + i + "-" + z + y;
     }
@@ -586,23 +755,25 @@ public class StructuralGraphBuilderService {
         private final boolean addTransverseCrossBraces;
         private final boolean addSideLongitudinalDiagonals;
         private final boolean addTopBottomLongitudinalDiagonals;
+        private final int longitudinalBraceStep;
 
-        private BracingProfile(boolean addTransverseCrossBraces, boolean addSideLongitudinalDiagonals, boolean addTopBottomLongitudinalDiagonals) {
+        private BracingProfile(boolean addTransverseCrossBraces, boolean addSideLongitudinalDiagonals, boolean addTopBottomLongitudinalDiagonals, int longitudinalBraceStep) {
             this.addTransverseCrossBraces = addTransverseCrossBraces;
             this.addSideLongitudinalDiagonals = addSideLongitudinalDiagonals;
             this.addTopBottomLongitudinalDiagonals = addTopBottomLongitudinalDiagonals;
+            this.longitudinalBraceStep = Math.max(1, longitudinalBraceStep);
         }
 
         static BracingProfile shellDominated() {
-            return new BracingProfile(false, false, false);
+            return new BracingProfile(false, false, false, 1);
         }
 
         static BracingProfile frameLight() {
-            return new BracingProfile(false, true, false);
+            return new BracingProfile(false, true, false, 1);
         }
 
         static BracingProfile spaceFrame() {
-            return new BracingProfile(false, true, true);
+            return new BracingProfile(false, true, true, 1);
         }
     }
 

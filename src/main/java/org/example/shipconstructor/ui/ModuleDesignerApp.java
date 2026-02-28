@@ -3,10 +3,15 @@ package org.example.shipconstructor.ui;
 import org.example.shipconstructor.chassis.domain.AccelerationEnvelope;
 import org.example.shipconstructor.chassis.domain.ChassisCalculationInput;
 import org.example.shipconstructor.chassis.domain.CubeDimensions;
+import org.example.shipconstructor.chassis.domain.EngineLayerConfig;
+import org.example.shipconstructor.chassis.domain.EngineLayerPattern;
+import org.example.shipconstructor.chassis.domain.EngineLayerSymmetryMode;
+import org.example.shipconstructor.chassis.domain.EngineLayoutConfig;
 import org.example.shipconstructor.chassis.domain.EngineeringStackSelection;
 import org.example.shipconstructor.chassis.domain.MissionPriority;
 import org.example.shipconstructor.chassis.domain.SafetyPriority;
 import org.example.shipconstructor.chassis.domain.StructuralDesignBasis;
+import org.example.shipconstructor.chassis.domain.StructuralOptimizationMode;
 import org.example.shipconstructor.chassis.graph.domain.StructuralGraphBuildResult;
 import org.example.shipconstructor.chassis.graph.domain.StructuralGraphLoadSet;
 import org.example.shipconstructor.chassis.graph.domain.StructuralGraphSolveResult;
@@ -27,7 +32,9 @@ import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SelectionMode;
 import javafx.scene.control.Tab;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
@@ -65,12 +72,30 @@ public class ModuleDesignerApp extends Application {
     private ComboBox<Integer> typeComboBox;
     private ComboBox<Integer> sizeTypeComboBox;
     private ComboBox<Integer> enginePlacementProfileComboBox;
+    private ComboBox<StructuralOptimizationMode> optimizationModeComboBox;
     private ComboBox<String> structureProfileCodeComboBox;
+    private ComboBox<String> engineLayerPatternComboBox;
+    private ComboBox<String> engineLayerSymmetryComboBox;
+    private ListView<String> engineLayoutLayersListView;
+    private TextField engineLayerXOffsetField;
+    private TextField engineLayerCountField;
+    private TextField engineLayerRotationField;
+    private TextField engineLayerRadiusYField;
+    private TextField engineLayerRadiusZField;
+    private TextField engineLayerThrustWeightField;
+    private final List<Map<String, Object>> engineLayoutLayerDrafts = new ArrayList<Map<String, Object>>();
     private ChassisGraphViewerPane chassisGraphViewerPane;
+    private Label chassisMarginStatusLabel;
     private TextArea previewArea;
     private TextArea messagesArea;
     private Label statusLabel;
     private Stage primaryStage;
+    private Map<Long, String> chassisBaseMaterialCatalog = ChassisEngineeringCatalogs.baseMaterials();
+    private Map<Long, String> chassisStructureTypeCatalog = ChassisEngineeringCatalogs.structureTypes();
+    private Map<Long, String> chassisManufacturingCatalog = ChassisEngineeringCatalogs.manufacturing();
+    private Map<Long, String> chassisAssemblyCatalog = ChassisEngineeringCatalogs.assembly();
+    private Map<Long, String> chassisQualityCatalog = ChassisEngineeringCatalogs.quality();
+    private Map<Long, String> chassisEnvironmentCatalog = ChassisEngineeringCatalogs.environments();
 
     public static void launchApp(String[] args) {
         launch(args);
@@ -80,6 +105,7 @@ public class ModuleDesignerApp extends Application {
     public void start(Stage stage) {
         this.primaryStage = stage;
         stage.setTitle("Module Designer (Local)");
+        loadChassisCatalogs();
 
         BorderPane root = new BorderPane();
         root.setPadding(new Insets(10));
@@ -124,6 +150,22 @@ public class ModuleDesignerApp extends Application {
         return toolbar;
     }
 
+    private void loadChassisCatalogs() {
+        try {
+            Path samplePath = Paths.get(System.getProperty("user.dir"), "data", "reference", "chassis_coefficients.sample.json");
+            ChassisEngineeringCatalogLoader.ChassisEngineeringCatalogsData loaded =
+                    ChassisEngineeringCatalogLoader.loadFromSampleJson(samplePath, jsonService);
+            chassisBaseMaterialCatalog = loaded.getBaseMaterials();
+            chassisStructureTypeCatalog = loaded.getStructureTypes();
+            chassisManufacturingCatalog = loaded.getManufacturing();
+            chassisAssemblyCatalog = loaded.getAssembly();
+            chassisQualityCatalog = loaded.getQuality();
+            chassisEnvironmentCatalog = loaded.getEnvironments();
+        } catch (Exception ignored) {
+            // Keep static fallback catalogs when sample JSON is unavailable or invalid.
+        }
+    }
+
     private TabPane buildTabs() {
         TabPane tabPane = new TabPane();
         tabPane.getTabs().add(createGeneralTab());
@@ -149,12 +191,15 @@ public class ModuleDesignerApp extends Application {
         row = addTextField(grid, row, "SizeDimZ", "SizeDim Z (cubes)", numericFilter(true, true));
         row = addStructureProfileCodeCombo(grid, row);
         row = addEnginePlacementProfileCombo(grid, row);
-        row = addChassisIdCombo(grid, row, "chassisBaseMaterialId", "Chassis A BaseMaterial", ChassisEngineeringCatalogs.baseMaterials());
-        row = addChassisIdCombo(grid, row, "chassisStructureTypeId", "Chassis B StructureType", ChassisEngineeringCatalogs.structureTypes());
-        row = addChassisIdCombo(grid, row, "chassisManufacturingProcessId", "Chassis C Manufacturing", ChassisEngineeringCatalogs.manufacturing());
-        row = addChassisIdCombo(grid, row, "chassisAssemblyProcessId", "Chassis D Assembly", ChassisEngineeringCatalogs.assembly());
-        row = addChassisIdCombo(grid, row, "chassisQualityProfileId", "Chassis E Quality", ChassisEngineeringCatalogs.quality());
-        row = addChassisIdCombo(grid, row, "chassisEnvironmentProfileId", "Chassis F Environment", ChassisEngineeringCatalogs.environments());
+        row = addChassisIdCombo(grid, row, "chassisBaseMaterialId", "Chassis A BaseMaterial", chassisBaseMaterialCatalog);
+        row = addChassisIdCombo(grid, row, "chassisStructureTypeId", "Chassis B StructureType", chassisStructureTypeCatalog);
+        row = addChassisIdCombo(grid, row, "chassisManufacturingProcessId", "Chassis C Manufacturing", chassisManufacturingCatalog);
+        row = addChassisIdCombo(grid, row, "chassisAssemblyProcessId", "Chassis D Assembly", chassisAssemblyCatalog);
+        row = addChassisIdCombo(grid, row, "chassisQualityProfileId", "Chassis E Quality", chassisQualityCatalog);
+        row = addChassisIdCombo(grid, row, "chassisEnvironmentProfileId", "Chassis F Environment", chassisEnvironmentCatalog);
+        row = addOptimizationModeCombo(grid, row);
+        row = addTextField(grid, row, "targetMinMarginIndex", "Target Min Margin Index", numericFilter(false, true));
+        row = addTextField(grid, row, "targetMaxMarginIndex", "Target Max Margin Index", numericFilter(false, true));
         row = addTextField(grid, row, "ModuleID", "ModuleID", numericFilter(true, true));
         row = addTextField(grid, row, "PartyID", "PartyID", numericFilter(true, true));
         row = addTextField(grid, row, "ModName", "ModName", null);
@@ -233,6 +278,8 @@ public class ModuleDesignerApp extends Application {
         box.setPadding(new Insets(10));
         box.getChildren().addAll(
                 createJsonArea("SizeDimentions", "SizeDimentions (JSON, cube dimensions x/y/z)"),
+                createJsonArea("EngineLayoutConfig", "EngineLayoutConfig (JSON, optional; overrides profile fallback)"),
+                createEngineLayoutBuilder(),
                 createJsonArea("SpecificModParamCrew", "SpecificModParamCrew"),
                 createJsonArea("SpecificModParamEmissions", "SpecificModParamEmissions"),
                 createJsonArea("SpecificModParamWeapon", "SpecificModParamWeapon"),
@@ -251,6 +298,188 @@ public class ModuleDesignerApp extends Application {
         Tab tab = new Tab("Specific JSON", scroll);
         tab.setClosable(false);
         return tab;
+    }
+
+    private VBox createEngineLayoutBuilder() {
+        VBox root = new VBox(6);
+        root.setPadding(new Insets(8));
+        root.setStyle("-fx-border-color: #555; -fx-border-width: 1; -fx-border-radius: 3; -fx-background-color: rgba(100,100,100,0.06);");
+        Label title = new Label("Engine Layout Builder (layer-based)");
+
+        GridPane grid = createFormGrid();
+        int row = 0;
+        engineLayerXOffsetField = new TextField("0.0");
+        row = addInlineField(grid, row, "xOffsetNormalized (-1..1)", engineLayerXOffsetField);
+        engineLayerCountField = new TextField("4");
+        row = addInlineField(grid, row, "enginesPerLayer", engineLayerCountField);
+        engineLayerPatternComboBox = new ComboBox<String>(FXCollections.observableArrayList("SINGLE", "LINE", "RING", "CROSS", "GRID"));
+        engineLayerPatternComboBox.setValue("RING");
+        row = addInlineCombo(grid, row, "pattern", engineLayerPatternComboBox);
+        engineLayerRotationField = new TextField("0.0");
+        row = addInlineField(grid, row, "planeRotationDeg", engineLayerRotationField);
+        engineLayerRadiusYField = new TextField("0.35");
+        row = addInlineField(grid, row, "radiusYNormalized", engineLayerRadiusYField);
+        engineLayerRadiusZField = new TextField("0.30");
+        row = addInlineField(grid, row, "radiusZNormalized", engineLayerRadiusZField);
+        engineLayerThrustWeightField = new TextField("1.0");
+        row = addInlineField(grid, row, "thrustWeight", engineLayerThrustWeightField);
+        engineLayerSymmetryComboBox = new ComboBox<String>(FXCollections.observableArrayList("STRICT", "MIRROR", "NONE"));
+        engineLayerSymmetryComboBox.setValue("STRICT");
+        addInlineCombo(grid, row, "symmetryMode", engineLayerSymmetryComboBox);
+
+        Button addLayerButton = new Button("Add Layer");
+        Button removeLayerButton = new Button("Remove Selected");
+        Button clearLayersButton = new Button("Clear Layers");
+        Button applyToJsonButton = new Button("Apply To JSON");
+        Button loadFromJsonButton = new Button("Load From JSON");
+
+        addLayerButton.setOnAction(e -> addEngineLayoutLayerDraft());
+        removeLayerButton.setOnAction(e -> removeSelectedEngineLayoutLayerDraft());
+        clearLayersButton.setOnAction(e -> clearEngineLayoutLayerDrafts());
+        applyToJsonButton.setOnAction(e -> applyEngineLayoutDraftsToJson());
+        loadFromJsonButton.setOnAction(e -> loadEngineLayoutDraftsFromJson());
+
+        HBox buttons = new HBox(8, addLayerButton, removeLayerButton, clearLayersButton, applyToJsonButton, loadFromJsonButton);
+        buttons.setAlignment(Pos.CENTER_LEFT);
+
+        engineLayoutLayersListView = new ListView<String>();
+        engineLayoutLayersListView.getSelectionModel().setSelectionMode(SelectionMode.SINGLE);
+        engineLayoutLayersListView.setPrefHeight(140);
+
+        root.getChildren().addAll(title, grid, buttons, engineLayoutLayersListView);
+        return root;
+    }
+
+    private int addInlineField(GridPane grid, int row, String labelText, TextField field) {
+        Label label = new Label(labelText);
+        grid.add(label, 0, row);
+        grid.add(field, 1, row);
+        GridPane.setHgrow(field, Priority.ALWAYS);
+        return row + 1;
+    }
+
+    private int addInlineCombo(GridPane grid, int row, String labelText, ComboBox<String> combo) {
+        Label label = new Label(labelText);
+        combo.setMaxWidth(Double.MAX_VALUE);
+        grid.add(label, 0, row);
+        grid.add(combo, 1, row);
+        GridPane.setHgrow(combo, Priority.ALWAYS);
+        return row + 1;
+    }
+
+    private void addEngineLayoutLayerDraft() {
+        Map<String, Object> layer = new LinkedHashMap<String, Object>();
+        layer.put("xOffsetNormalized", parseDoubleText(engineLayerXOffsetField, 0.0d));
+        layer.put("enginesPerLayer", Long.valueOf(Math.max(1L, Math.round(parseDoubleText(engineLayerCountField, 1.0d)))));
+        layer.put("pattern", engineLayerPatternComboBox == null || engineLayerPatternComboBox.getValue() == null ? "SINGLE" : engineLayerPatternComboBox.getValue());
+        layer.put("planeRotationDeg", parseDoubleText(engineLayerRotationField, 0.0d));
+        layer.put("radiusYNormalized", parseDoubleText(engineLayerRadiusYField, 0.35d));
+        layer.put("radiusZNormalized", parseDoubleText(engineLayerRadiusZField, 0.30d));
+        layer.put("thrustWeight", parseDoubleText(engineLayerThrustWeightField, 1.0d));
+        layer.put("symmetryMode", engineLayerSymmetryComboBox == null || engineLayerSymmetryComboBox.getValue() == null ? "STRICT" : engineLayerSymmetryComboBox.getValue());
+        engineLayoutLayerDrafts.add(layer);
+        refreshEngineLayoutDraftList();
+    }
+
+    private void removeSelectedEngineLayoutLayerDraft() {
+        if (engineLayoutLayersListView == null) {
+            return;
+        }
+        int index = engineLayoutLayersListView.getSelectionModel().getSelectedIndex();
+        if (index < 0 || index >= engineLayoutLayerDrafts.size()) {
+            return;
+        }
+        engineLayoutLayerDrafts.remove(index);
+        refreshEngineLayoutDraftList();
+    }
+
+    private void clearEngineLayoutLayerDrafts() {
+        engineLayoutLayerDrafts.clear();
+        refreshEngineLayoutDraftList();
+    }
+
+    private void refreshEngineLayoutDraftList() {
+        if (engineLayoutLayersListView == null) {
+            return;
+        }
+        List<String> lines = new ArrayList<String>();
+        for (int i = 0; i < engineLayoutLayerDrafts.size(); i++) {
+            Map<String, Object> layer = engineLayoutLayerDrafts.get(i);
+            lines.add((i + 1) + ": x=" + layer.get("xOffsetNormalized")
+                    + ", count=" + layer.get("enginesPerLayer")
+                    + ", pattern=" + layer.get("pattern")
+                    + ", rot=" + layer.get("planeRotationDeg")
+                    + ", ry=" + layer.get("radiusYNormalized")
+                    + ", rz=" + layer.get("radiusZNormalized")
+                    + ", thrust=" + layer.get("thrustWeight")
+                    + ", sym=" + layer.get("symmetryMode"));
+        }
+        engineLayoutLayersListView.setItems(FXCollections.observableArrayList(lines));
+    }
+
+    private void applyEngineLayoutDraftsToJson() {
+        TextArea area = jsonFields.get("EngineLayoutConfig");
+        if (area == null) {
+            return;
+        }
+        Map<String, Object> root = new LinkedHashMap<String, Object>();
+        root.put("layers", new ArrayList<Map<String, Object>>(engineLayoutLayerDrafts));
+        try {
+            area.setText(jsonService.toPrettyJsonValue(root));
+            setStatus("EngineLayoutConfig JSON updated from layer builder");
+        } catch (IOException ex) {
+            showError("Engine layout JSON build failed", ex.getMessage());
+        }
+    }
+
+    private void loadEngineLayoutDraftsFromJson() {
+        TextArea area = jsonFields.get("EngineLayoutConfig");
+        engineLayoutLayerDrafts.clear();
+        if (area == null || isBlank(area.getText())) {
+            refreshEngineLayoutDraftList();
+            return;
+        }
+        try {
+            Object parsed = jsonService.parseJsonValue(area.getText());
+            if (!(parsed instanceof Map)) {
+                refreshEngineLayoutDraftList();
+                return;
+            }
+            Object layersObj = ((Map<?, ?>) parsed).get("layers");
+            if (!(layersObj instanceof List)) {
+                refreshEngineLayoutDraftList();
+                return;
+            }
+            for (Object item : (List<?>) layersObj) {
+                if (item instanceof Map) {
+                    Map<?, ?> src = (Map<?, ?>) item;
+                    Map<String, Object> dst = new LinkedHashMap<String, Object>();
+                    dst.put("xOffsetNormalized", toDouble(src.get("xOffsetNormalized"), 0.0d));
+                    dst.put("enginesPerLayer", Long.valueOf(Math.max(1L, toLong(src.get("enginesPerLayer"), 1L))));
+                    dst.put("pattern", asUpperText(src.get("pattern"), "SINGLE"));
+                    dst.put("planeRotationDeg", toDouble(src.get("planeRotationDeg"), 0.0d));
+                    dst.put("radiusYNormalized", toDouble(src.get("radiusYNormalized"), 0.35d));
+                    dst.put("radiusZNormalized", toDouble(src.get("radiusZNormalized"), 0.30d));
+                    dst.put("thrustWeight", toDouble(src.get("thrustWeight"), 1.0d));
+                    dst.put("symmetryMode", asUpperText(src.get("symmetryMode"), "STRICT"));
+                    engineLayoutLayerDrafts.add(dst);
+                }
+            }
+        } catch (Exception ex) {
+            // keep empty drafts; raw JSON remains editable
+        }
+        refreshEngineLayoutDraftList();
+    }
+
+    private double parseDoubleText(TextField field, double defaultValue) {
+        if (field == null || isBlank(field.getText())) {
+            return defaultValue;
+        }
+        try {
+            return Double.parseDouble(normalizeNumberText(field.getText()));
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
     }
 
     private Tab createPreviewTab() {
@@ -280,19 +509,25 @@ public class ModuleDesignerApp extends Application {
         pane.setPadding(new Insets(10));
 
         Button buildButton = new Button("Build From Form");
+        Button lightweightButton = new Button("Apply Lightweight Pass");
         Button clearButton = new Button("Clear View");
-        Label hint = new Label("Uses SizeType/SizeTotal/SizeDimentions + StructureProfileCode (+ EnginePlacementProfileClass if set)");
-        HBox toolbar = new HBox(8, buildButton, clearButton, hint);
+        Label hint = new Label("Uses SizeType/SizeTotal/SizeDimentions + StructureProfileCode + EngineLayoutConfig (profile is fallback)");
+        chassisMarginStatusLabel = new Label("Margin band: n/a");
+        HBox toolbar = new HBox(8, buildButton, lightweightButton, clearButton, chassisMarginStatusLabel, hint);
         toolbar.setAlignment(Pos.CENTER_LEFT);
         toolbar.setPadding(new Insets(0, 0, 8, 0));
 
         chassisGraphViewerPane = new ChassisGraphViewerPane();
         chassisGraphViewerPane.clear("No graph built yet.\nSelect chassis-like values and click 'Build From Form'.");
 
-        buildButton.setOnAction(event -> buildChassisGraphFromForm());
+        buildButton.setOnAction(event -> buildChassisGraphFromForm(false));
+        lightweightButton.setOnAction(event -> buildChassisGraphFromForm(true));
         clearButton.setOnAction(event -> {
             if (chassisGraphViewerPane != null) {
                 chassisGraphViewerPane.clear("View cleared.");
+            }
+            if (chassisMarginStatusLabel != null) {
+                chassisMarginStatusLabel.setText("Margin band: n/a");
             }
             setStatus("Chassis graph view cleared");
         });
@@ -466,6 +701,16 @@ public class ModuleDesignerApp extends Application {
         return row + 1;
     }
 
+    private int addOptimizationModeCombo(GridPane grid, int row) {
+        Label label = new Label("Structural Optimization Mode");
+        optimizationModeComboBox = new ComboBox<StructuralOptimizationMode>(FXCollections.observableArrayList(StructuralOptimizationMode.values()));
+        optimizationModeComboBox.setMaxWidth(Double.MAX_VALUE);
+        grid.add(label, 0, row);
+        grid.add(optimizationModeComboBox, 1, row);
+        GridPane.setHgrow(optimizationModeComboBox, Priority.ALWAYS);
+        return row + 1;
+    }
+
     private int addChassisIdCombo(GridPane grid, int row, String key, String labelText, Map<Long, String> catalog) {
         Label label = new Label(labelText);
         List<Long> ids = new ArrayList<Long>(catalog.keySet());
@@ -587,6 +832,10 @@ public class ModuleDesignerApp extends Application {
         putChassisId(moduleData, "chassisAssemblyProcessId");
         putChassisId(moduleData, "chassisQualityProfileId");
         putChassisId(moduleData, "chassisEnvironmentProfileId");
+        moduleData.put("chassisOptimizationMode", optimizationModeComboBox == null || optimizationModeComboBox.getValue() == null ? null : optimizationModeComboBox.getValue().name());
+        putRawNumberOrText(moduleData, "targetMinMarginIndex");
+        putRawNumberOrText(moduleData, "targetMaxMarginIndex");
+        putRawJsonText(moduleData, "EngineLayoutConfig");
         putRawText(moduleData, "ModName");
         putRawNumberOrText(moduleData, "NumberProduced");
         moduleData.put("Type", typeComboBox.getValue());
@@ -716,12 +965,12 @@ public class ModuleDesignerApp extends Application {
         }
     }
 
-    private void buildChassisGraphFromForm() {
+    private void buildChassisGraphFromForm(boolean forceLightweightPass) {
         if (chassisGraphViewerPane == null) {
             return;
         }
         try {
-            ChassisCalculationInput input = buildChassisGraphInputFromForm();
+            ChassisCalculationInput input = buildChassisGraphInputFromForm(forceLightweightPass);
             StructuralGraphBuildResult graphResult = chassisGraphBuilder.build(input);
             StructuralGraphLoadSet loadSet = chassisGraphLoadPlanner.plan(input, graphResult.getGraph());
             StructuralGraphSolveResult solveResult = chassisGraphSolver.solve(input, graphResult.getGraph(), loadSet);
@@ -757,16 +1006,23 @@ public class ModuleDesignerApp extends Application {
                     warnings.append("- ").append(w).append('\n');
                 }
             }
+            if (forceLightweightPass) {
+                warnings.append("Note: Lightweight pass executed with optimization mode MIN_MASS for this build only.\n");
+            }
             chassisGraphViewerPane.setData(graphResult.getGraph(), loadSet, solveResult, warnings.toString().trim());
+            updateMarginStatusLabel(input, solveResult);
             setStatus("Chassis graph built from form");
         } catch (Exception ex) {
             chassisGraphViewerPane.clear("Build failed: " + ex.getMessage());
+            if (chassisMarginStatusLabel != null) {
+                chassisMarginStatusLabel.setText("Margin band: error");
+            }
             setStatus("Chassis graph build failed");
             showError("Chassis graph build failed", ex.getMessage());
         }
     }
 
-    private ChassisCalculationInput buildChassisGraphInputFromForm() throws Exception {
+    private ChassisCalculationInput buildChassisGraphInputFromForm(boolean forceLightweightPass) throws Exception {
         if (sizeTypeComboBox == null || sizeTypeComboBox.getValue() == null) {
             throw new IllegalArgumentException("SizeType is required");
         }
@@ -779,6 +1035,15 @@ public class ModuleDesignerApp extends Application {
         if (enginePlacementProfileClass < 0) {
             enginePlacementProfileClass = 0;
         }
+        StructuralOptimizationMode optimizationMode = optimizationModeComboBox == null || optimizationModeComboBox.getValue() == null
+                ? StructuralOptimizationMode.BALANCED
+                : optimizationModeComboBox.getValue();
+        if (forceLightweightPass) {
+            optimizationMode = StructuralOptimizationMode.MIN_MASS;
+        }
+        double targetMinMarginIndex = parseOptionalDoubleField("targetMinMarginIndex", 2.0d);
+        double targetMaxMarginIndex = parseOptionalDoubleField("targetMaxMarginIndex", 8.0d);
+        EngineLayoutConfig engineLayoutConfig = parseEngineLayoutConfigJson();
 
         Long baseMaterialId = getChassisIdValue("chassisBaseMaterialId");
         Long structureTypeId = getChassisIdValue("chassisStructureTypeId");
@@ -803,7 +1068,11 @@ public class ModuleDesignerApp extends Application {
                 enginePlacementProfileClass >= 3 && enginePlacementProfileClass <= 4,
                 10000,
                 null,
-                enginePlacementProfileClass
+                enginePlacementProfileClass,
+                engineLayoutConfig,
+                optimizationMode,
+                targetMinMarginIndex,
+                targetMaxMarginIndex
         );
 
         return new ChassisCalculationInput(
@@ -822,12 +1091,54 @@ public class ModuleDesignerApp extends Application {
         );
     }
 
+    private void updateMarginStatusLabel(ChassisCalculationInput input, StructuralGraphSolveResult solveResult) {
+        if (chassisMarginStatusLabel == null || input == null || input.getStructuralDesignBasis() == null || solveResult == null) {
+            return;
+        }
+        double minMargin = input.getStructuralDesignBasis().getTargetMinMarginIndex();
+        double maxMargin = input.getStructuralDesignBasis().getTargetMaxMarginIndex();
+        int under = 0;
+        int inBand = 0;
+        int over = 0;
+        for (org.example.shipconstructor.chassis.graph.domain.StructuralGraphMemberEnvelope e : solveResult.getMemberEnvelopes()) {
+            if (e.getRole() != org.example.shipconstructor.chassis.graph.domain.StructuralMemberRole.PRIMARY_LOAD_PATH) {
+                continue;
+            }
+            double demand = Math.max(1e-6d, e.getPeakCombinedAbsIndex());
+            double margin = 1.0d / demand;
+            if (margin < minMargin) {
+                under++;
+            } else if (margin > maxMargin) {
+                over++;
+            } else {
+                inBand++;
+            }
+        }
+        String state;
+        if (under > 0) {
+            state = "UNDER";
+        } else if (inBand > 0) {
+            state = "IN-BAND";
+        } else {
+            state = "OVER";
+        }
+        chassisMarginStatusLabel.setText("Margin band: " + state + " (under=" + under + ", in=" + inBand + ", over=" + over + ")");
+    }
+
     private long parseOptionalLongField(String key, long defaultValue) {
         TextField field = textFields.get(key);
         if (field == null || isBlank(field.getText())) {
             return defaultValue;
         }
         return Long.parseLong(normalizeIntegerText(field.getText()));
+    }
+
+    private double parseOptionalDoubleField(String key, double defaultValue) {
+        TextField field = textFields.get(key);
+        if (field == null || isBlank(field.getText())) {
+            return defaultValue;
+        }
+        return Double.parseDouble(normalizeNumberText(field.getText()));
     }
 
     private Long parseOptionalLongBoxed(String key) {
@@ -866,6 +1177,41 @@ public class ModuleDesignerApp extends Application {
         return new CubeDimensions(x, y, z);
     }
 
+    private EngineLayoutConfig parseEngineLayoutConfigJson() throws Exception {
+        TextArea area = jsonFields.get("EngineLayoutConfig");
+        if (area == null || isBlank(area.getText())) {
+            return null;
+        }
+        Object parsed = jsonService.parseJsonValue(area.getText());
+        if (!(parsed instanceof Map)) {
+            throw new IllegalArgumentException("EngineLayoutConfig must be JSON object with layers[]");
+        }
+        Object layersObj = ((Map<?, ?>) parsed).get("layers");
+        if (!(layersObj instanceof List)) {
+            throw new IllegalArgumentException("EngineLayoutConfig.layers must be array");
+        }
+        List<?> layerList = (List<?>) layersObj;
+        List<EngineLayerConfig> layers = new ArrayList<EngineLayerConfig>();
+        for (Object item : layerList) {
+            if (!(item instanceof Map)) {
+                continue;
+            }
+            Map<?, ?> m = (Map<?, ?>) item;
+            double xOffset = toDouble(m.get("xOffsetNormalized"), 0.0d);
+            int count = (int) Math.max(1L, toLong(m.get("enginesPerLayer"), 1L));
+            String patternText = asUpperText(m.get("pattern"), "SINGLE");
+            EngineLayerPattern pattern = parseLayerPattern(patternText);
+            double rotation = toDouble(m.get("planeRotationDeg"), 0.0d);
+            double ry = toDouble(m.get("radiusYNormalized"), 0.35d);
+            double rz = toDouble(m.get("radiusZNormalized"), 0.30d);
+            double thrustWeight = toDouble(m.get("thrustWeight"), 1.0d);
+            String symmetryText = asUpperText(m.get("symmetryMode"), "STRICT");
+            EngineLayerSymmetryMode symmetry = parseLayerSymmetry(symmetryText);
+            layers.add(new EngineLayerConfig(xOffset, count, pattern, rotation, ry, rz, thrustWeight, symmetry));
+        }
+        return layers.isEmpty() ? null : new EngineLayoutConfig(layers);
+    }
+
     private int toPositiveInt(Object value, String fieldName) {
         if (value == null) {
             throw new IllegalArgumentException("Missing " + fieldName);
@@ -880,6 +1226,58 @@ public class ModuleDesignerApp extends Application {
             throw new IllegalArgumentException(fieldName + " must be > 0");
         }
         return v;
+    }
+
+    private long toLong(Object value, long defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).longValue();
+        }
+        try {
+            return Long.parseLong(String.valueOf(value));
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    private double toDouble(Object value, double defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        if (value instanceof Number) {
+            return ((Number) value).doubleValue();
+        }
+        try {
+            return Double.parseDouble(normalizeNumberText(String.valueOf(value)));
+        } catch (NumberFormatException ex) {
+            return defaultValue;
+        }
+    }
+
+    private String asUpperText(Object value, String defaultValue) {
+        if (value == null) {
+            return defaultValue;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? defaultValue : text.toUpperCase();
+    }
+
+    private EngineLayerPattern parseLayerPattern(String value) {
+        try {
+            return EngineLayerPattern.valueOf(value);
+        } catch (Exception ex) {
+            return EngineLayerPattern.SINGLE;
+        }
+    }
+
+    private EngineLayerSymmetryMode parseLayerSymmetry(String value) {
+        try {
+            return EngineLayerSymmetryMode.valueOf(value);
+        } catch (Exception ex) {
+            return EngineLayerSymmetryMode.STRICT;
+        }
     }
 
     private File ensureDefaultDataDir() {
@@ -961,6 +1359,18 @@ public class ModuleDesignerApp extends Application {
         applyChassisIdComboValue("chassisAssemblyProcessId", data.get("chassisAssemblyProcessId"));
         applyChassisIdComboValue("chassisQualityProfileId", data.get("chassisQualityProfileId"));
         applyChassisIdComboValue("chassisEnvironmentProfileId", data.get("chassisEnvironmentProfileId"));
+        Object mode = data.get("chassisOptimizationMode");
+        if (optimizationModeComboBox != null) {
+            if (mode != null) {
+                try {
+                    optimizationModeComboBox.setValue(StructuralOptimizationMode.valueOf(String.valueOf(mode)));
+                } catch (IllegalArgumentException ignored) {
+                    optimizationModeComboBox.setValue(null);
+                }
+            } else {
+                optimizationModeComboBox.setValue(null);
+            }
+        }
 
         Object structureProfileCodeValue = data.get("structureProfileCode");
         if (structureProfileCodeComboBox != null) {
@@ -1004,6 +1414,7 @@ public class ModuleDesignerApp extends Application {
             }
         }
         populateSizeDimFieldsFromJsonArea();
+        loadEngineLayoutDraftsFromJson();
 
         Object localDesigner = data.get("_localDesigner");
         if (localDesigner instanceof Map) {
@@ -1042,6 +1453,9 @@ public class ModuleDesignerApp extends Application {
         if (enginePlacementProfileComboBox != null) {
             enginePlacementProfileComboBox.setValue(null);
         }
+        if (optimizationModeComboBox != null) {
+            optimizationModeComboBox.setValue(null);
+        }
         for (ComboBox<Long> combo : chassisIdComboBoxes.values()) {
             combo.setValue(null);
         }
@@ -1057,6 +1471,7 @@ public class ModuleDesignerApp extends Application {
         if (messagesArea != null) {
             messagesArea.clear();
         }
+        clearEngineLayoutLayerDrafts();
     }
 
     private void applyDefaults() {
@@ -1069,6 +1484,9 @@ public class ModuleDesignerApp extends Application {
         if (enginePlacementProfileComboBox != null && enginePlacementProfileComboBox.getValue() == null) {
             enginePlacementProfileComboBox.setValue(Integer.valueOf(0));
         }
+        if (optimizationModeComboBox != null && optimizationModeComboBox.getValue() == null) {
+            optimizationModeComboBox.setValue(StructuralOptimizationMode.BALANCED);
+        }
         setIfPresent("SizeTotal", "0");
         setIfPresent("SizeDimX", "0");
         setIfPresent("SizeDimY", "0");
@@ -1079,6 +1497,8 @@ public class ModuleDesignerApp extends Application {
         setChassisIdDefault("chassisAssemblyProcessId", 1L);
         setChassisIdDefault("chassisQualityProfileId", 1L);
         setChassisIdDefault("chassisEnvironmentProfileId", 1L);
+        setIfPresent("targetMinMarginIndex", "2.0");
+        setIfPresent("targetMaxMarginIndex", "8.0");
         setIfPresent("DryWeight", "0");
         setIfPresent("FullWeight", "0");
         setIfPresent("CargoVolumeMax", "0");
@@ -1113,8 +1533,10 @@ public class ModuleDesignerApp extends Application {
         setJsonDefault("SpecificModParamWeapon", "{}");
         setJsonDefault("SpecificModParamTrust", "{}");
         setJsonDefault("Armored", "{}");
+        setJsonDefault("EngineLayoutConfig", "{\n  \"layers\": [\n    {\n      \"xOffsetNormalized\": 0.0,\n      \"enginesPerLayer\": 4,\n      \"pattern\": \"RING\",\n      \"planeRotationDeg\": 0.0,\n      \"radiusYNormalized\": 0.35,\n      \"radiusZNormalized\": 0.30,\n      \"thrustWeight\": 1.0,\n      \"symmetryMode\": \"STRICT\"\n    }\n  ]\n}");
         setJsonDefault("SizeDimentions", "{\"x\":0,\"y\":0,\"z\":0}");
         setJsonDefault("Blocks", "[]");
+        loadEngineLayoutDraftsFromJson();
     }
 
     private void assignNextModuleIdFromDatabase() {
